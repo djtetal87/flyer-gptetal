@@ -1,0 +1,82 @@
+name: Build for iPhone
+
+# Genera un .ipa SIN firmar (para Sideloadly / AltStore).
+# El runner macOS crea el scaffold de iOS con `flutter create`, agrega los
+# permisos de Fotos al Info.plist y compila en release para arm64.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+jobs:
+  ios:
+    name: Flyer GPTetal iOS arm64
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the version
+        id: version
+        run: |
+          version=$(sed -n 's/^version: *\(.*\)/\1/p' pubspec.yaml | head -1 | cut -d+ -f1)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Building Flyer GPTetal $version"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: iOS scaffold (flutter create)
+        run: |
+          set -euo pipefail
+          if [ ! -d ios ]; then
+            flutter create --platforms ios --org cl.tetal --project-name flyer_gptetal /tmp/scaffold
+            cp -R /tmp/scaffold/ios ./ios
+          fi
+          PL=ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 'Flyer GPTetal'" "$PL" \
+            || /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string 'Flyer GPTetal'" "$PL"
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'Para adjuntar flyers de referencia, logos y fotos.'" "$PL" || true
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string 'Para guardar los flyers generados en tus Fotos.'" "$PL" || true
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" "$PL" || true
+          # iOS 13+: image_picker / gal lo requieren
+          sed -i '' "s/^# platform :ios.*/platform :ios, '13.0'/" ios/Podfile || true
+          sed -i '' "s/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*;/IPHONEOS_DEPLOYMENT_TARGET = 13.0;/g" ios/Runner.xcodeproj/project.pbxproj
+          plutil -p "$PL" | grep -E "Display|Photo"
+
+      - name: Flutter build (unsigned)
+        run: |
+          set -o pipefail
+          flutter --version
+          flutter pub get
+          flutter analyze --no-fatal-infos --no-fatal-warnings || true
+          flutter build ios --release --no-codesign 2>&1 | tee build.log
+
+      - name: Build log to the summary (failure only)
+        if: failure()
+        run: |
+          {
+            echo "### Build failed: iOS arm64"
+            echo '```'
+            tail -n 150 build.log 2>/dev/null || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stage the .ipa
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p stage payload/Payload
+          cp -R build/ios/iphoneos/Runner.app payload/Payload/
+          (cd payload && ditto -c -k --keepParent Payload "../stage/FlyerGPTetal-$VERSION-ios-arm64.ipa")
+          ls -l stage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FlyerGPTetal-ios-arm64
+          path: stage/*
+          if-no-files-found: error
