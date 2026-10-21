@@ -73,7 +73,14 @@ class _HomeShellState extends State<HomeShell> {
     }
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Flyer GPTetal'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Flyer GPTetal'),
+            Text(s.providerLabel,
+                style: Theme.of(context).textTheme.labelSmall),
+          ],
+        ),
         actions: [
           IconButton(
             tooltip: 'Ajustes',

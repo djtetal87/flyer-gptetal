@@ -91,7 +91,7 @@ class _ManualScreenState extends State<ManualScreen> {
         : PromptBuilder.fromManual(text, hasImages: refs.isNotEmpty);
 
     try {
-      final img = await OpenAIService(widget.settings)
+      final img = await ImageService.from(widget.settings)
           .generate(prompt: prompt, references: refs);
       setState(() => _msgs.add(_Msg.flyer(img, prompt)));
     } catch (e) {
@@ -162,7 +162,7 @@ class _ManualScreenState extends State<ManualScreen> {
             builder: (_) => ResultScreen(
               image: m.result!,
               prompt: m.prompt ?? '',
-              service: OpenAIService(widget.settings),
+              service: ImageService.from(widget.settings),
             ),
           )),
           child: Container(

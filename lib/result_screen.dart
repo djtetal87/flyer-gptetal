@@ -14,7 +14,7 @@ import 'prompt_builder.dart';
 class ResultScreen extends StatefulWidget {
   final Uint8List image;
   final String prompt;
-  final OpenAIService service;
+  final ImageService service;
 
   const ResultScreen({
     super.key,

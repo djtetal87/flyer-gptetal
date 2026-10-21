@@ -9,6 +9,11 @@ Generador de flyers verticales (1024×1536) para discotecas, bares y eventos, us
 
 La receta de prompts está en `lib/prompt_builder.dart`. Ahí se ajusta todo lo que define "cómo se ven" los flyers.
 
+## Proveedores
+
+- **OpenAI (GPT Image)**: por defecto. El más fiel con textos.
+- **fal.ai (Flux)**: selector en Ajustes. Texto→imagen con Flux Pro 1.1 / Dev / Schnell; correcciones y referencias con Flux Kontext. Usa la misma key que PhotoTetal.
+
 ## 1. Crear el proyecto en el Mac
 
 Necesitas Flutter y Xcode instalados.

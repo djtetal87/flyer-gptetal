@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import 'fal_service.dart';
 import 'settings.dart';
 
 /// Imagen de referencia adjunta (bytes + nombre).
@@ -12,11 +13,24 @@ class RefImage {
   const RefImage(this.bytes, this.name);
 }
 
-class OpenAIException implements Exception {
+class ImageGenException implements Exception {
   final String message;
-  OpenAIException(this.message);
+  ImageGenException(this.message);
   @override
   String toString() => message;
+}
+
+/// Interfaz común: cada proveedor recibe un prompt (+ referencias opcionales)
+/// y devuelve los bytes PNG/JPG de un flyer vertical.
+abstract class ImageService {
+  Future<Uint8List> generate({
+    required String prompt,
+    List<RefImage> references = const [],
+  });
+
+  /// Elige el proveedor según los ajustes.
+  static ImageService from(Settings s) =>
+      s.isOpenAI ? OpenAIService(s) : FalService(s);
 }
 
 /// Llama a la API de imágenes de OpenAI (o a tu proxy si lo configuraste).
@@ -24,7 +38,7 @@ class OpenAIException implements Exception {
 /// - Sin imágenes adjuntas → POST /v1/images/generations
 /// - Con imágenes adjuntas (referencias o el flyer anterior a corregir)
 ///   → POST /v1/images/edits (multipart)
-class OpenAIService {
+class OpenAIService implements ImageService {
   final Settings settings;
   OpenAIService(this.settings);
 
@@ -36,14 +50,13 @@ class OpenAIService {
       ? {}
       : {'Authorization': 'Bearer ${settings.apiKey}'};
 
-  /// Genera (o edita, si hay referencias) un flyer vertical.
-  /// Devuelve los bytes PNG de la imagen.
+  @override
   Future<Uint8List> generate({
     required String prompt,
     List<RefImage> references = const [],
   }) async {
-    if (!settings.isConfigured) {
-      throw OpenAIException(
+    if (settings.apiKey.isEmpty && settings.proxyUrl.isEmpty) {
+      throw ImageGenException(
           'Falta la API key de OpenAI. Configúrala en Ajustes.');
     }
 
@@ -92,14 +105,14 @@ class OpenAIService {
         final j = jsonDecode(res.body);
         msg = j['error']?['message']?.toString() ?? msg;
       } catch (_) {}
-      throw OpenAIException(msg);
+      throw ImageGenException(msg);
     }
 
     final json = jsonDecode(res.body) as Map<String, dynamic>;
     final data = (json['data'] as List?) ?? [];
-    if (data.isEmpty) throw OpenAIException('La API no devolvió imagen.');
+    if (data.isEmpty) throw ImageGenException('La API no devolvió imagen.');
     final b64 = data.first['b64_json'] as String?;
-    if (b64 == null) throw OpenAIException('Respuesta sin b64_json.');
+    if (b64 == null) throw ImageGenException('Respuesta sin b64_json.');
     return base64Decode(b64);
   }
 }

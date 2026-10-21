@@ -48,7 +48,7 @@ class _AutoScreenState extends State<AutoScreen> {
       _toast('Ponle al menos el nombre del evento.');
       return;
     }
-    final service = OpenAIService(widget.settings);
+    final service = ImageService.from(widget.settings);
     if (!widget.settings.isConfigured) {
       _toast('Configura tu API key en Ajustes (ícono de engranaje).');
       return;
