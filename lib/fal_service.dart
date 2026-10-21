@@ -68,7 +68,10 @@ class FalService implements ImageService {
         .post(Uri.parse('https://queue.fal.run/$model'),
             headers: _headers, body: jsonEncode(body))
         .timeout(const Duration(minutes: 1));
-    if (submit.statusCode != 200) throw ImageGenException(_err(submit));
+    // La cola responde 200 o 202 (Accepted) al encolar.
+    if (submit.statusCode != 200 && submit.statusCode != 202) {
+      throw ImageGenException(_err(submit));
+    }
     final sj = jsonDecode(submit.body) as Map<String, dynamic>;
     final statusUrl = sj['status_url'] as String?;
     final responseUrl = sj['response_url'] as String?;
@@ -81,9 +84,15 @@ class FalService implements ImageService {
     while (true) {
       await Future.delayed(const Duration(seconds: 2));
       final st = await http.get(Uri.parse(statusUrl), headers: _headers);
-      if (st.statusCode != 200) throw ImageGenException(_err(st));
+      // 200 = completado, 202 = en cola / en proceso.
+      if (st.statusCode != 200 && st.statusCode != 202) {
+        throw ImageGenException(_err(st));
+      }
       final s = (jsonDecode(st.body) as Map<String, dynamic>)['status'];
       if (s == 'COMPLETED') break;
+      if (s == 'FAILED' || s == 'CANCELLED') {
+        throw ImageGenException('fal.ai: el pedido falló ($s).');
+      }
       if (DateTime.now().isAfter(deadline)) {
         throw ImageGenException('fal.ai tardó demasiado. Intenta de nuevo.');
       }

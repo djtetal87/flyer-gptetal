@@ -1,7 +1,7 @@
 name: flyer_gptetal
 description: Flyer GPTetal — generador de flyers para discotecas, bares y eventos con GPT Image.
 publish_to: "none"
-version: 0.2.0+2
+version: 0.2.1+3
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
